@@ -6,6 +6,56 @@ import pathlib
 import pkg_resources
 from loguru import logger
 
+def singleton(cls):
+    instances = {}
+    def getinstance():
+        if cls not in instances:
+            instances[cls] = cls()
+        return instances[cls]
+    return getinstance
+
+@singleton
+class SessionEnvironment:
+    def __init__(self):
+        self.pip_list=[]
+        self.system_list=[]
+
+    def update_pip_list(self, package_or_list):
+        def actual_func(package):
+            if package not in self.pip_list:
+                self.pip_list.append(package)
+        if isinstance(package_or_list, list):
+            for package in package_or_list:
+                actual_func(package)
+        elif isinstance(package_or_list, str):
+            actual_func(package_or_list)
+        else:
+            raise ValueError(f"{package_or_list} with type of {type(package_or_list)} is not supported.")
+
+    def get_pip_list(self):
+        return self.pip_list
+
+    def update_system_list(self, package_or_list):
+        def actual_func(package):
+            if package not in self.pip_list:
+                self.system_list.append(package)
+        if isinstance(package_or_list, list):
+            for package in package_or_list:
+                actual_func(package)
+        elif isinstance(package_or_list, str):
+            actual_func(package_or_list)
+        else:
+            raise ValueError(f"{package_or_list} with type of {type(package_or_list)} is not supported.")
+
+    def get_system_list(self):
+        return self.system_list
+
+    def clean(self):
+        self.pip_list = []
+        self.system_list = []
+
+SessionENV = SessionEnvironment()
+
 def list_requirements(requirements_path):
     with pathlib.Path(requirements_path).open() as requirements_txt:
         install_requires = [
@@ -37,48 +87,6 @@ def fix_package_name(package):
         b = package_name_map[b]
     #print(b)
     return b
-
-class SessionENV:
-    pip_list=[]
-    system_list=[]
-    @classmethod
-    def update_pip_list(cls, package_or_list):
-        def actual_func(package):
-            if package not in cls.pip_list:
-                cls.pip_list.append(package)
-        if isinstance(package_or_list, list):
-            for package in package_or_list:
-                actual_func(package)
-        elif isinstance(package_or_list, str):
-            actual_func(package_or_list)
-        else:
-            raise ValueError(f"{package_or_list} with type of {type(package_or_list)} is not supported.")
-
-    @classmethod
-    def get_pip_list(cls):
-        return cls.pip_list
-
-    @classmethod
-    def update_system_list(cls, package_or_list):
-        def actual_func(package):
-            if package not in cls.pip_list:
-                cls.system_list.append(package)
-        if isinstance(package_or_list, list):
-            for package in package_or_list:
-                actual_func(package)
-        elif isinstance(package_or_list, str):
-            actual_func(package_or_list)
-        else:
-            raise ValueError(f"{package_or_list} with type of {type(package_or_list)} is not supported.")
-
-    @classmethod
-    def get_system_list(cls):
-        return cls.system_list
-
-    @classmethod
-    def clean(cls):
-        cls.pip_list = []
-        cls.system_list = []
 
 def check_availability_and_install(package_or_list, verbose = 0, force = True):
     if package_or_list == "" or package_or_list == []:

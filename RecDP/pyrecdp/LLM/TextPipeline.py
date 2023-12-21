@@ -20,6 +20,9 @@ import json
 
 total_mem = int(psutil.virtual_memory().total * 0.6)
 total_cores = psutil.cpu_count(logical=False)
+TEST_MODE = os.getenv("TEST_MODE") == '1'
+if TEST_MODE:
+    print("THIS IS TEST MODE")
 
 
 class TextPipeline(BasePipeline):
@@ -41,6 +44,11 @@ class TextPipeline(BasePipeline):
             if hasattr(self, 'engine_name') and self.engine_name == 'ray':
                 if ray.is_initialized():
                     ray.shutdown()
+        try:
+            from pyrecdp.core.import_utils import SessionENV
+            SessionENV.clean()
+        except:
+            pass
 
     def check_platform(self, executable_sequence):
         is_spark = True
@@ -95,16 +103,27 @@ class TextPipeline(BasePipeline):
         executable_sequence = self.executable_sequence
 
         engine_name = self.check_platform(executable_sequence)
+        from pyrecdp.core.import_utils import SessionENV
+        runtime_env = {'pip': SessionENV.get_pip_list()} if len(SessionENV.get_pip_list()) > 0 else None
+        system_env = SessionENV.get_system_list() if len(SessionENV.get_system_list()) > 0 else None
+        logger.info(f'pip dependencies are {runtime_env}, system dependencies are {system_env}')
 
         if engine_name == 'ray':
-            print("init ray")
             if not ray.is_initialized():
                 print(f"init ray with total mem of {total_mem}, total core of {total_cores}")
-                try:
-                    ray.init(object_store_memory=total_mem, num_cpus=total_cores)
-                except:
-                    ray.init()
+                if not TEST_MODE:
+                    try:
+                        ray.init(object_store_memory=total_mem, num_cpus=total_cores, runtime_env=runtime_env)
+                    except:
+                        ray.init(runtime_env=runtime_env)
+                else:
+                    try:
+                        ray.init(object_store_memory=total_mem, num_cpus=total_cores)
+                    except:
+                        ray.init()
                 self.ray_start_by_us = True
+            else:
+                logger.info("Ray is initialized, so we won't be able init it")
 
             # execute
             with Timer(f"execute with ray"):
@@ -344,14 +363,27 @@ class ResumableTextPipeline(TextPipeline):
         global_data = None
         op_chain = []
 
+        from pyrecdp.core.import_utils import SessionENV
+        runtime_env = {'pip': SessionENV.get_pip_list()} if len(SessionENV.get_pip_list()) > 0 else None
+        system_env = SessionENV.get_system_list() if len(SessionENV.get_system_list()) > 0 else None
+        logger.info(f'pip dependencies are {runtime_env}, system dependencies are {system_env}')
+
         if engine_name == 'ray':
             if not ray.is_initialized():
-                print(f"init ray with total mem of {total_mem}")
-                try:
-                    ray.init(object_store_memory=total_mem, num_cpus=total_cores)
-                except:
-                    ray.init()
+                print(f"init ray with total mem of {total_mem}, total core of {total_cores}")
+                if not TEST_MODE:
+                    try:
+                        ray.init(object_store_memory=total_mem, num_cpus=total_cores, runtime_env=runtime_env)
+                    except:
+                        ray.init(runtime_env=runtime_env)
+                else:
+                    try:
+                        ray.init(object_store_memory=total_mem, num_cpus=total_cores)
+                    except:
+                        ray.init()
                 self.ray_start_by_us = True
+            else:
+                logger.info("Ray is initialized, so we won't be able init it")
 
             for op in executable_sequence:
                 if isinstance(op, PerfileReader):
